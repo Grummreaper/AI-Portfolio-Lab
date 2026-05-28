@@ -55,12 +55,43 @@ if len(tickers) < 2:
 # -----------------------------
 @st.cache_data
 def load_data(tickers, start, end):
-    data = yf.download(tickers, start=start, end=end)["Adj Close"]
+    raw = yf.download(
+        tickers,
+        start=start,
+        end=end,
+        auto_adjust=False,
+        progress=False
+    )
+
+    if raw.empty:
+        return pd.DataFrame()
+
+    if isinstance(raw.columns, pd.MultiIndex):
+        if "Adj Close" in raw.columns.get_level_values(0):
+            data = raw["Adj Close"]
+        elif "Close" in raw.columns.get_level_values(0):
+            data = raw["Close"]
+        else:
+            st.error("Could not find price data in Yahoo Finance download.")
+            st.stop()
+    else:
+        if "Adj Close" in raw.columns:
+            data = raw["Adj Close"]
+        elif "Close" in raw.columns:
+            data = raw["Close"]
+        else:
+            st.error("Could not find price data in Yahoo Finance download.")
+            st.stop()
+
     if isinstance(data, pd.Series):
         data = data.to_frame()
+
     return data.dropna()
 
 prices = load_data(tickers, start_date, end_date)
+if prices.empty:
+    st.error("No price data was downloaded. Check ticker symbols or date range.")
+    st.stop()
 returns = prices.pct_change().dropna()
 
 # -----------------------------
